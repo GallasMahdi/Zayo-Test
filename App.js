@@ -1,20 +1,22 @@
-import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, Text, View } from 'react-native';
+import React, { useEffect } from 'react';
+import AppNavigator from './src/navigation/AppNavigator';
+import { registerBackgroundSync } from './src/backgroundSync'; // Adjust the path as needed
 
-export default function App() {
-  return (
-    <View style={styles.container}>
-      <Text>Open up App.js to start working on your app!</Text>
-      <StatusBar style="auto" />
-    </View>
-  );
-}
+const App = () => {
+  useEffect(() => {
+    const setup = async () => {
+      try {
+        await registerBackgroundSync();
+        console.log("Background sync successfully registered");
+      } catch (error) {
+        console.error("Failed to register background sync:", error);
+      }
+    };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});
+    setup();
+  }, []);
+
+  return <AppNavigator />;
+};
+
+export default App;
