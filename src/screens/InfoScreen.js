@@ -10,17 +10,22 @@ const InfoScreen = ({ navigation }) => {
     const fetchUserName = async () => {
       const storedUserName = await AsyncStorage.getItem("username");
       if (storedUserName) {
-        const name = storedUserName.split('@')[0]; // Extract the name before the "@"
+        const name = storedUserName.split("@")[0]; // Extract the name before the "@"
         setUserName(name);
+        // Pass the userName to the navigation params
+        navigation.setParams({ userName: name });
       }
     };
 
     fetchUserName();
-  }, []);
+  }, [navigation]);
 
   const handleLogout = async () => {
     await AsyncStorage.clear();
-    navigation.navigate("Login");
+    navigation.reset({
+      index: 0,
+      routes: [{ name: "Login" }],
+    });
   };
 
   return (
@@ -28,23 +33,23 @@ const InfoScreen = ({ navigation }) => {
       <Image source={require("../assets/zayo.png")} style={styles.zayo} />
 
       <View style={styles.infoBox}>
-        <Text style={styles.infoText}>Version: 1.0.3</Text>
+        <Text style={styles.infoLabel}>Version de l'application</Text>
+        <Text style={styles.infoText}>1.0.3</Text>
       </View>
 
       <View style={styles.infoBox}>
-        <Text style={styles.infoText}>User: {userName}</Text>
+        <Text style={styles.infoLabel}>Identification de l'utilisateur</Text>
+        <Text style={styles.infoText}>{userName}</Text>
       </View>
 
       <View style={styles.infoBox}>
-        <Text style={styles.infoText}>
-            Server URL:
-             {BASE_URL}</Text>
+        <Text style={styles.infoLabel}>Serveur URL</Text>
+        <Text style={styles.infoText}>{BASE_URL}</Text>
       </View>
 
       <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
         <Text style={styles.logoutButtonText}>Log Out</Text>
       </TouchableOpacity>
-
       <Image source={require("../assets/coppelis.png")} style={styles.logo} />
     </View>
   );
@@ -58,7 +63,7 @@ const styles = StyleSheet.create({
     height: 50,
     resizeMode: "contain",
     marginBottom: 20,
-    padding:40
+    padding: 40,
   },
   container: {
     flex: 1,
@@ -72,8 +77,8 @@ const styles = StyleSheet.create({
     height: 50,
     resizeMode: "contain",
     marginBottom: 30,
-    margin:40,
-    marginVertical:49
+    margin: 40,
+    marginVertical: 49,
   },
   infoBox: {
     width: "90%",
@@ -94,9 +99,9 @@ const styles = StyleSheet.create({
     borderWidth: 2,
   },
   infoText: {
-    fontSize: 18,
+    fontSize: 14,
     color: "#333",
-    fontWeight:'bold'
+    fontWeight: "bold",
   },
   logoutButton: {
     backgroundColor: "#01385E",

@@ -10,6 +10,7 @@ import {
   Alert,
   Modal,
   FlatList,
+  ActivityIndicator
 } from "react-native";
 import { Image } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -19,6 +20,7 @@ import * as MediaLibrary from "expo-media-library";
 import * as ImagePicker from "expo-image-picker";
 import Icon from "react-native-vector-icons/FontAwesome"; // Import FontAwesome icon set
 import { BASE_URL } from "../config";
+import * as FileSystem from "expo-file-system";
 
 const AddItem = ({ navigation, route }) => {
   const [objectCode, setObjectCode] = useState("");
@@ -39,6 +41,7 @@ const AddItem = ({ navigation, route }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedImage, setSelectedImage] = useState(null);
   const [isViewingPhoto, setIsViewingPhoto] = useState(false);
+  const [isProcessCompleted, setIsProcessCompleted] = useState(false);
 
   const objectTypes = ["BPE", "CHAMBRE", "ODF", "SITE"];
   const states = ["Bon", "Mauvais", "Critique"];
@@ -87,7 +90,6 @@ const AddItem = ({ navigation, route }) => {
   const isFullyCompleted = isEntered && isExited;
 
   const handleEnter = async () => {
-    // Check for empty or whitespace-only fields
     if (!objectCode.trim() || !objectType.trim() || !creator.trim()) {
       Alert.alert(
         "Error",
@@ -99,45 +101,47 @@ const AddItem = ({ navigation, route }) => {
       Alert.alert("Error", "You have already entered");
       return;
     }
-
-    if (!objectCode || !objectType || !creator) {
-      Alert.alert(
-        "Error",
-        "Object Code, Object Type, and Creator are required"
-      );
-      return;
+  
+    setIsSubmitting(true); // Start spinner
+  
+    try {
+      const existingItem = await getItem(objectCode);
+      if (existingItem) {
+        Alert.alert("Error", "An item with this Object Code already exists");
+        return;
+      }
+  
+      const currentDateTime = new Date().toLocaleString(); // Set current date/time
+      
+      setBeginDate(currentDateTime);
+      setIsEntered(true);
+  
+      const currentLocation = await Location.getCurrentPositionAsync({});
+      setLocation(currentLocation);
+  
+      const itemData = {
+        objectCode,
+        objectType,
+        creator,
+        latitude: currentLocation.coords.latitude.toString(),
+        longitude: currentLocation.coords.longitude.toString(),
+        beginDate: new Date().toISOString(),
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        comment,
+        state,
+        projectCode,
+        picture: selectedImage,
+      };
+  
+      await saveItem(itemData);
+      navigation.navigate("ListItems", { newItem: itemData });
+    } catch (error) {
+      console.error("Error in handleEnter:", error.message);
+    } finally {
+      setIsSubmitting(false); // Stop spinner
     }
-
-    const existingItem = await getItem(objectCode);
-    if (existingItem) {
-      Alert.alert("Error", "An item with this Object Code already exists");
-      return;
-    }
-
-    const currentDateTime = new Date();
-    setBeginDate(currentDateTime.toLocaleString());
-    setIsEntered(true);
-
-    const currentLocation = await Location.getCurrentPositionAsync({});
-    setLocation(currentLocation);
-    const id = Date.now().toString(); // Generate a unique ID based on the current timestamp
-
-    const itemData = {
-      objectCode,
-      objectType,
-      creator,
-      latitude: currentLocation.coords.latitude.toString(),
-      longitude: currentLocation.coords.longitude.toString(),
-      beginDate: currentDateTime.toISOString(),
-      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-      comment,
-      state,
-      projectCode,
-    };
-
-    await saveItem(itemData);
-    navigation.navigate("ListItems", { newItem: itemData });
   };
+  
   // Update handleExit
   const handleExit = async () => {
     if (!isEntered) {
@@ -148,38 +152,61 @@ const AddItem = ({ navigation, route }) => {
       Alert.alert("Error", "You have already exited");
       return;
     }
-
-    const currentDateTime = new Date();
-    setEndDate(currentDateTime.toLocaleString());
-    setIsExited(true);
-    setIsViewOnly(true); // Set to true after exiting
-
-    // Retrieve and update item data
-    const itemData = await getItem(objectCode);
-    if (itemData) {
-      itemData.endDate = currentDateTime.toISOString();
-      await saveItem(itemData);
-      navigation.navigate("ListItems", { updatedItem: itemData });
-    } else {
-      Alert.alert("Error", "Item not found");
+  
+    setIsSubmitting(true); // Start spinner
+  
+    try {
+      const currentDateTime = new Date();
+      setEndDate(currentDateTime.toLocaleString());
+      setIsExited(true);
+      setIsViewOnly(true); // Set to true after exiting
+      setIsProcessCompleted(true); // Set this to true when process is completed
+  
+      const itemData = await getItem(objectCode);
+      if (itemData) {
+        itemData.endDate = currentDateTime.toISOString();
+        itemData.picture = selectedImage;
+        await saveItem(itemData);
+        navigation.navigate("ListItems", { updatedItem: itemData });
+      } else {
+        Alert.alert("Error", "Item not found");
+      }
+    } catch (error) {
+      console.error("Error in handleExit:", error.message);
+    } finally {
+      setIsSubmitting(false); // Stop spinner
     }
   };
-
+  
   const saveItem = async (itemData) => {
     try {
       const networkState = await Network.getNetworkStateAsync();
       if (networkState.isInternetReachable) {
         const token = await AsyncStorage.getItem("token");
 
+        // Create a FormData object to send multipart/form-data
+        const formData = new FormData();
+        for (const key in itemData) {
+          if (key === "picture" && itemData[key]) {
+            formData.append("picture", {
+              uri: itemData[key],
+              type: "image/jpeg",
+              name: "photo.jpg",
+            });
+          } else {
+            formData.append(key, itemData[key]);
+          }
+        }
+
         const response = await fetch(`${BASE_URL}/api/pointing`, {
           method: "POST",
           headers: {
-            "Content-Type": "application/json",
+            "Content-Type": "multipart/form-data",
             Authorization: `Bearer ${token}`,
           },
-          body: JSON.stringify(itemData),
+          body: formData,
         });
-        console.log(itemData, "aa");
+
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
@@ -201,14 +228,22 @@ const AddItem = ({ navigation, route }) => {
       await AsyncStorage.setItem(key, JSON.stringify(itemData));
     }
   };
-
   const getItem = async (objectCode) => {
     try {
       const key = `item_${objectCode}`;
-      console.log("Fetching item with key:", key); // Debug log
+      console.log("Fetching item with key:", key);
       const value = await AsyncStorage.getItem(key);
       if (value) {
-        return JSON.parse(value);
+        const item = JSON.parse(value);
+        if (item.picture) {
+          // If the picture is a local URI, you might want to check if it still exists
+          // and handle accordingly (e.g., show a placeholder if the file is missing)
+          const fileInfo = await FileSystem.getInfoAsync(item.picture);
+          if (!fileInfo.exists) {
+            item.picture = null; // or set to a placeholder image
+          }
+        }
+        return item;
       }
       return null;
     } catch (error) {
@@ -341,23 +376,19 @@ const AddItem = ({ navigation, route }) => {
         <TextInput
           style={[
             styles.input,
-            (!editable ||
-              isViewOnly ||
-              (label === "Heure de sortie" && isExited)) &&
+            (!editable || isViewOnly || isProcessCompleted) &&
               styles.disabledInput,
-            label === "Commentaire" && styles.multilineInput, // Add multiline styles
+            label === "Commentaire" && styles.multilineInput,
+            label === "Heure de l'entrée" || label === "Heure de sortie" ? styles.dateInputDesign : null,
+
           ]}
           value={value}
           onChangeText={onChangeText}
-          editable={
-            editable &&
-            !isViewOnly &&
-            !(label === "Heure de sortie" && isExited)
-          }
-          multiline={label === "Commentaire"} // Enable multiline only for "Commentaire"
-          numberOfLines={label === "Commentaire" ? 4 : 1} // Set default height for multiline input
+          editable={editable && !isViewOnly && !isProcessCompleted}
+          multiline={label === "Commentaire"}
+          numberOfLines={label === "Commentaire" ? 4 : 1}
         />
-        {label === "Commentaire" && !isViewOnly && !isExited && (
+        {label === "Commentaire" && !isViewOnly && !isProcessCompleted && (
           <TouchableOpacity
             onPress={selectedImage ? handlePhotoOptions : handleCameraPress}
           >
@@ -387,9 +418,12 @@ const AddItem = ({ navigation, route }) => {
       <TouchableOpacity
         style={[
           styles.selectField,
-          (isViewOnly || isExited) && styles.disabledInput,
+          (isViewOnly || isExited || isProcessCompleted) &&
+            styles.disabledInput,
         ]}
-        onPress={!isViewOnly && !isExited ? onPress : null}
+        onPress={
+          !isViewOnly && !isExited && !isProcessCompleted ? onPress : null
+        }
       >
         <Text style={[styles.selectText, !value && styles.placeholderText]}>
           {value || label}
@@ -427,96 +461,111 @@ const AddItem = ({ navigation, route }) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView>
-        <View style={styles.form}>
-          {renderInputField(
-            "Numéro SEP ou SITE ou CHAMBRE",
-            objectCode,
-            setObjectCode,
-            true,
-            !isEntered
-          )}
-          {renderSelectField(
-            "Type objet",
-            objectType,
-            () => setShowObjectTypeModal(true),
-            true
-          )}
-          {renderModal(showObjectTypeModal, objectTypes, setObjectType, () =>
-            setShowObjectTypeModal(false)
-          )}
-          {renderInputField(
-            "Nom d'utilisateur",
-            creator,
-            setCreator,
-            true,
-            !isEntered
-          )}
-          {renderInputField(
-            "Code Projet",
-            projectCode,
-            setProjectCode,
+    <ScrollView>
+      <View style={styles.form}>
+        {renderInputField(
+          "Numéro SEP ou SITE ou CHAMBRE",
+          objectCode,
+          setObjectCode,
+          true,
+          !isEntered
+        )}
+        {renderSelectField(
+          "Type objet",
+          objectType,
+          () => setShowObjectTypeModal(true),
+          true
+        )}
+        {renderModal(showObjectTypeModal, objectTypes, setObjectType, () =>
+          setShowObjectTypeModal(false)
+        )}
+        {renderInputField(
+          "Nom d'utilisateur",
+          creator,
+          setCreator,
+          true,
+          !isEntered
+        )}
+        {renderInputField(
+          "Code Projet",
+          projectCode,
+          setProjectCode,
+          false,
+          !isExited
+        )}
+        {renderSelectField(
+          "Etat",
+          state,
+          () => setShowStateModal(true),
+          false
+        )}
+        {renderModal(showStateModal, states, setState, () =>
+          setShowStateModal(false)
+        )}
+        {renderInputField(
+          "Commentaire",
+          comment,
+          setComment,
+          false,
+          !isExited
+        )}
+        {renderInputField(
+          "Heure de l'entrée",
+          beginDate,
+          setBeginDate,
+          false,
+          false
+        )}
+        {isEntered &&
+          renderInputField(
+            "Heure de sortie",
+            endDate,
+            setEndDate,
             false,
-            !isExited
+            false // Disable editing for exit date
           )}
-          {renderSelectField(
-            "Etat",
-            state,
-            () => setShowStateModal(true),
-            false
-          )}
-          {renderModal(showStateModal, states, setState, () =>
-            setShowStateModal(false)
-          )}
-          {renderInputField(
-            "Commentaire",
-            comment,
-            setComment,
-            false,
-            !isExited
-          )}
-          {renderInputField(
-            "Heure de l'entrée",
-            beginDate,
-            setBeginDate,
-            false,
-            false
-          )}
-          {isEntered &&
-            renderInputField(
-              "Heure de sortie",
-              endDate,
-              setEndDate,
-              false,
-              false // Disable editing for exit date
-            )}
 
-          <View style={styles.buttonContainer}>
-            {!isViewOnly && !isEntered && (
-              <TouchableOpacity
-                style={[styles.button, styles.enterButton]}
-                onPress={handleEnter}
-              >
-                <Text style={styles.buttonText}>Entrer</Text>
-              </TouchableOpacity>
-            )}
-            {isEntered && !isExited && (
-              <TouchableOpacity
-                style={[
-                  styles.button,
-                  styles.exitButton,
-                  styles.fullWidthButton,
-                ]}
-                onPress={handleExit}
-              >
-                <Text style={styles.buttonText}>Sortir</Text>
-              </TouchableOpacity>
-            )}
-          </View>
+        <View style={styles.buttonContainer}>
+          {!isViewOnly && !isEntered && !isProcessCompleted && (
+            <TouchableOpacity
+              style={[styles.button, styles.enterButton]}
+              onPress={handleEnter}
+            >
+              <Text style={styles.buttonText}>Entrer</Text>
+            </TouchableOpacity>
+          )}
+          {isEntered && !isExited && !isProcessCompleted && (
+            <TouchableOpacity
+              style={[
+                styles.button,
+                styles.exitButton,
+                styles.fullWidthButton,
+              ]}
+              onPress={handleExit}
+            >
+              <Text style={styles.buttonText}>Sortir</Text>
+            </TouchableOpacity>
+          )}
         </View>
-      </ScrollView>
-      {renderPhotoViewerModal()}
-    </SafeAreaView>
+        {selectedImage && (
+          <View style={styles.imageContainer}>
+            <Image
+              source={{ uri: selectedImage }}
+              style={styles.displayedImage}
+            />
+          </View>
+        )}
+      </View>
+    </ScrollView>
+    
+    {isSubmitting && (
+      <View style={styles.spinnerContainer}>
+        <ActivityIndicator size="large" color="#0000ff" />
+      </View>
+    )}
+    
+    {renderPhotoViewerModal()}
+  </SafeAreaView>
   );
 };
 
@@ -532,9 +581,9 @@ const styles = StyleSheet.create({
     marginBottom: 15,
   },
   label: {
-    fontSize: 16,
+    fontSize: 14,
     marginBottom: 5,
-    fontWeight: "bold",
+    fontWeight: "400",
   },
   fullWidthButton: {
     flex: 1,
@@ -545,8 +594,8 @@ const styles = StyleSheet.create({
   },
   input: {
     borderWidth: 1,
-    borderColor: "#e0e0e0",
-    borderRadius: 5,
+    borderColor:'black',
+    borderRadius: 6,
     padding: 15,
     fontSize: 16,
     flex: 1,
@@ -592,7 +641,7 @@ const styles = StyleSheet.create({
   },
   selectField: {
     borderWidth: 1,
-    borderColor: "#e0e0e0",
+    borderColor:'black',
     borderRadius: 5,
     padding: 15,
     backgroundColor: "#fff",
@@ -639,11 +688,16 @@ const styles = StyleSheet.create({
     backgroundColor: "#01385E",
     marginRight: 5,
   },
+  dateInputDesign :{
+    color:'black',
+    borderColor:'black',
+    textAlign:'center'
+
+  },
   exitButton: {
     backgroundColor: "#cccccc",
     marginLeft: 5,
     backgroundColor: "#01385E",
-
   },
   commentContainer: {
     flexDirection: "row",
@@ -651,6 +705,13 @@ const styles = StyleSheet.create({
   },
   cameraIcon: {
     marginLeft: 8,
+  },
+  spinnerContainer: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.3)', // Darker background for better contrast
+    zIndex: 1000, // Ensure the spinner is on top of other content
   },
   buttonText: {
     color: "#fff",
@@ -688,7 +749,6 @@ const styles = StyleSheet.create({
   closeButtonText: {
     color: "#fff",
     fontWeight: "bold",
-    
   },
   commentContainer: {
     flexDirection: "row",

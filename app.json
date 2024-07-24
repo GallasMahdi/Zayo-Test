@@ -4,7 +4,7 @@
     "slug": "ProjectZayo",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/zayo.png",
+    "icon": "./assets/splash.png",
     "userInterfaceStyle": "light",
     "splash": {
       "image": "./assets/splash.png",
@@ -13,14 +13,18 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/zayo.png",
+        "foregroundImage": "./assets/splash.png",
         "backgroundColor": "#ffffff"
       },
       "permissions": [
+        "INTERNET",
         "ACCESS_NETWORK_STATE",
         "RECEIVE_BOOT_COMPLETED",
-        "WAKE_LOCK"
-      ]
+        "WAKE_LOCK",
+        "android.permission.RECEIVE_BOOT_COMPLETED",
+        "android.permission.WAKE_LOCK"
+      ],
+      "package": "com.gallasmehdi.ProjectZayo"
     },
     "plugins": [
       [
@@ -32,8 +36,10 @@
         }
       ]
     ],
-    "permissions": [
-      "INTERNET"
-    ]
+    "extra": {
+      "eas": {
+        "projectId": "174fe2f0-7e0a-491f-899b-ae5a4feab21a"
+      }
+    }
   }
 }

@@ -3,6 +3,7 @@ import { View, StyleSheet, TouchableOpacity, Text } from 'react-native';
 import Icon from 'react-native-vector-icons/FontAwesome';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CommonActions ,useNavigation } from '@react-navigation/native';
+import Feather from '@expo/vector-icons/Feather';
 
 const HomeScreen = ({ }) => {
   const [username, setUsername] = useState('');
@@ -35,12 +36,10 @@ const HomeScreen = ({ }) => {
   return (
     <View style={styles.container}>
       <TouchableOpacity style={styles.iconContainer} onPress={() => navigation.navigate('addItem')}>
-        <Icon name="plus" size={150} color="#01385E" />
-        <Text style={styles.iconText}>Add Item</Text>
+      <Feather name="plus-square" size={120} color="#01385E" />
       </TouchableOpacity>
       <TouchableOpacity style={styles.iconContainer} onPress={() => navigation.navigate('ListItems')}>
-        <Icon name="list" size={150} color="#01385E" />
-        <Text style={styles.iconText}>List Items</Text>
+        <Icon name="list" size={120} color="#01385E" />
       </TouchableOpacity>
     </View>
   );
@@ -56,6 +55,7 @@ const styles = StyleSheet.create({
   iconContainer: {
     alignItems: 'center',
     marginVertical: 20,
+    paddingT:13
   },
   iconText: {
     fontSize: 20,

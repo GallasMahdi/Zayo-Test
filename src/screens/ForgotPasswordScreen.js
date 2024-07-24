@@ -40,7 +40,7 @@ const ForgotPasswordScreen = ({ navigation }) => {
       await axios.post(`${BASE_URL}/api/forgotPassword`, {
         username: email,
       });
-      alert("Password reset link has been sent to your email.");
+      alert("Password","Password reset link has been sent to your email.");
       setEmail("");
     } catch (error) {
       console.error(error);

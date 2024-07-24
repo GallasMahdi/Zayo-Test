@@ -32,7 +32,6 @@ const AppNavigator = () => {
             component={ForgotPasswordScreen}
             options={{
               headerShown: false,
-
             }}
           />
           <Stack.Screen
@@ -51,30 +50,32 @@ const AppNavigator = () => {
                   <Ionicons
                     name="information-circle-outline"
                     size={34}
-                    color="#7F7F7F"
+                    color="#01385E"
                     style={{ padding: 3 }}
                   />
                 </TouchableOpacity>
               ),
+              headerTitle: () => null, // Set headerTitle to a function that returns null
             })}
           />
           <Stack.Screen
             name="InfoScreen"
             component={InfoScreen}
             options={({ route, navigation }) => ({
-                title: route.params?.isViewOnly ? "View Item" : "Add Item",
-                headerShown: true,
-                headerTitle: 'About',
-                headerTitleAlign: 'center',
-                headerLeft: () => (
-                    <TouchableOpacity
-                    onPress={() => navigation.goBack()}
-                    style={{ marginLeft: 10 }}>
-                    <Ionicons name="arrow-back" size={24} color="black" />
-                  </TouchableOpacity>
-                ),
-              })}
-            />
+              title: route.params?.isViewOnly ? "View Item" : "Add Item",
+              headerShown: true,
+              headerTitle: "About",
+              headerTitleAlign: "center",
+              headerLeft: () => (
+                <TouchableOpacity
+                  onPress={() => navigation.goBack()}
+                  style={{ marginLeft: 10 }}
+                >
+                  <Ionicons name="arrow-back" size={24} color="black" />
+                </TouchableOpacity>
+              ),
+            })}
+          />
           <Stack.Screen
             name="addItem"
             component={AddItem}

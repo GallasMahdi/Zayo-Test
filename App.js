@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import AppNavigator from './src/navigation/AppNavigator';
 import { registerBackgroundSync } from './src/backgroundSync'; // Adjust the path as needed
+import { AppState } from 'react-native';
 
 const App = () => {
   useEffect(() => {
@@ -13,7 +14,10 @@ const App = () => {
       }
     };
 
-    setup();
+    // Register background sync only if the app is in the foreground
+    if (AppState.currentState === 'active') {
+      setup();
+    }
   }, []);
 
   return <AppNavigator />;
